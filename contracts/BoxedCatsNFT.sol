@@ -1,18 +1,4 @@
 // SPDX-License-Identifier: MIT
-
-// Amended by HashLips
-/**
-    !Disclaimer!
-    These contracts have been used to create tutorials,
-    and was created for the purpose to teach people
-    how to create smart contracts on the blockchain.
-    please review this code on your own before using any of
-    the following code for production.
-    HashLips will not be liable in any way if for the use 
-    of the code. That being said, the code has been tested 
-    to the best of the developers' knowledge to work as intended.
-*/
-
 pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -23,7 +9,7 @@ contract BoxedCatsNFT is ERC721Enumerable, Ownable {
 
   string baseURI;
   string public baseExtension = ".json";
-  uint256 public cost = 0.5 ether;
+  uint256 public cost = 0.69 ether;
   uint256 public maxSupply = 9999;
   uint256 public maxMintAmount = 100;
   bool public paused = true;
@@ -31,10 +17,10 @@ contract BoxedCatsNFT is ERC721Enumerable, Ownable {
   string public notRevealedUri;
 
   bool public isLimitedMintingOnly = true;
-  uint256 whitelistMaxMint = 100;
+  uint256 whitelistMaxMint = 10;
   mapping(address => uint) public coOwnerAddress;
   mapping(address => uint) public whiteListAddress;
-  mapping(address => uint256) public mintedCountWL;
+  mapping(address => uint256) public whiteListMintCount;
 
   constructor(
     string memory _name,
@@ -61,20 +47,23 @@ contract BoxedCatsNFT is ERC721Enumerable, Ownable {
 
   function setPublicMinting() public onlyOwner {
     isLimitedMintingOnly = false;
+    cost = 1 ether;
   }
 
   function setCoOwner(address coOwner) public onlyOwner {
     coOwnerAddress[coOwner] = 1;
+    whiteListAddress[coOwner] = 1;
   }
 
   function removeCoOwner(address coOwner) public onlyOwner {
     coOwnerAddress[coOwner] = 0;
+    whiteListAddress[coOwner] = 0;
   }
 
   // main mint fn
   function mint(uint256 _mintAmount) public payable {
     uint256 supply = totalSupply();
-    require(!paused);
+    require(!paused, 'Minting is paused');
     require(_mintAmount > 0, '_mintAmount should be greater than 0');
     require(_mintAmount <= maxMintAmount, '_mintAmount should not exceed maxMintAmount');
     require(supply + _mintAmount <= maxSupply, 'Not enough tokens to mint');
@@ -83,7 +72,9 @@ contract BoxedCatsNFT is ERC721Enumerable, Ownable {
       require(msg.value >= cost * _mintAmount, 'Payment is not enough to mint');
     }
 
-    if (isLimitedMintingOnly) {
+    if (msg.sender == owner() || coOwnerAddress[msg.sender] == 1) {
+      mintPublic(msg.sender, _mintAmount, supply);
+    } else if (isLimitedMintingOnly) {
       mintWhitelist(msg.sender, _mintAmount, supply);
     } else {
       mintPublic(msg.sender, _mintAmount, supply);
@@ -92,11 +83,11 @@ contract BoxedCatsNFT is ERC721Enumerable, Ownable {
 
   function mintWhitelist(address to, uint amount, uint256 supply) private {
     require(whiteListAddress[to] == 1, 'Address is not whitelisted');
-    require(mintedCountWL[to] + amount <= whitelistMaxMint, 'Max NFT of Whitelisted exceeded');
+    require(whiteListMintCount[to] + amount <= whitelistMaxMint, 'Max NFT of Whitelisted exceeded');
 
     for (uint256 i = 1; i <= amount; i++) {
       _safeMint(to, supply + i);
-      mintedCountWL[to]++;
+      whiteListMintCount[to]++;
     }
   }
 
